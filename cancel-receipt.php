@@ -1,16 +1,21 @@
 <?php
     session_start();
 
+    // Check if the user is logged in
     if (!isset($_SESSION['user'])) {
+        // Redirect to the login page if not logged in
         header("Location: login.php");
         exit();
     }
     
     include 'connect.php';
 
-    ini_set('display_errors', 1);
-    error_reporting(E_ALL);
+        $sql = "SELECT i.id, i.hall_no, i.stand_number, i.no_of_badges, i.total_amount, i.transaction_type, i.transaction_ref_no, 
+                i.created_date, i.cancelled_date, e.company_name
+                FROM receipts i LEFT JOIN exhibitors e ON i.exhibitor_id = e.exhibitor_id
+                WHERE i.cancelled = 1";
 
+    $result = $conn->query($sql);
 ?>
 
 <!DOCTYPE html>
@@ -36,36 +41,6 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <!-- Include Select2 JS -->
     <script src="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/js/select2.min.js"></script>
-
-    <style>
-        .select2-container--default .select2-selection--single {
-            height: 40px !important;
-        }
-
-        .select2-container--default .select2-selection--multiple {
-            height: 40px !important;
-        }
-
-        .select2-container--default .select2-selection--single .select2-selection__rendered {
-            line-height: 38px !important;
-        }
-
-        .select2-container--default .select2-selection--single .select2-selection__arrow {
-            top: 8px !important;
-        }
-    </style>
-
-    <script defer>
-        // Calculate total amount whenever the number of badges is entered
-        function calculateTotal() {
-            var badgeCount = document.getElementById('badge_no').value;
-            var pricePerBadge = document.getElementById('price_per_badge').value;
-            var totalAmount = badgeCount * pricePerBadge;
-
-            // Set the total amount field
-            document.getElementById('total_amount').value = totalAmount;
-        }
-    </script>
 </head>
 
 <body>
@@ -211,17 +186,17 @@
                     <!-- begin sidebar-nav -->
                     <div class="sidebar-nav scrollbar scroll_light">
                         <ul class="metismenu " id="sidebarNav">
-                            <li class="nav-static-title"><?php echo 'Welcome'; ?></li>
+                            <li class="nav-static-title"><?php echo 'Welcome' ?></li>
                             <li>
                                 <a href="index.php" aria-expanded="false">
                                     <i class="nav-icon ti ti-rocket"></i>
                                     <span class="nav-title"> Dashboard</span>
                                 </a>
                             </li>
-                            <li class="active"><a href="receipt-form.php" aria-expanded="false"><i class="nav-icon ti ti-pencil-alt"></i><span class="nav-title">Create New Receipt</span></a> </li>
+                            <li><a href="receipt-form.php" aria-expanded="false"><i class="nav-icon ti ti-pencil-alt"></i><span class="nav-title">Create New Receipt</span></a> </li>
                             <li><a href="re-print.php" aria-expanded="false"><i class="nav-icon ti ti-hand-open"></i><span class="nav-title">Re-print Receipt</span></a> </li>
                             <li><a href="cancel.php" aria-expanded="false"><i class="nav-icon ti ti-email"></i><span class="nav-title">Issued Receipts</span></a> </li>
-                            <li>
+                            <li class="active">
                                 <a href="cancel-receipt.php" aria-expanded="false">
                                     <i class="nav-icon ti ti-layout-column3-alt"></i>
                                     <span class="nav-title">Cancelled Receipts</span>
@@ -248,7 +223,7 @@
                                 <!-- begin page title -->
                                 <div class="d-block d-sm-flex flex-nowrap align-items-center">
                                     <div class="page-title mb-2 mb-sm-0">
-                                        <h1>Create a new Receipt</h1>
+                                        <h1>Cancelled Receipts</h1>
                                     </div>
                                     <div class="ml-auto d-flex align-items-center">
                                         <nav>
@@ -257,7 +232,7 @@
                                                     <a href="index.php"><i class="ti ti-home"></i></a>
                                                 </li>
                                                 <li class="breadcrumb-item">
-                                                    Create a new Receipt
+                                                Cancelled Receipts
                                                 </li>
                                             </ol>
                                         </nav>
@@ -269,99 +244,61 @@
                         <!-- end row -->
                         <!-- begin row -->
                         <div class="row">
-                            <div class="col-xl-12">
+                        <div class="col-lg-12">
                                 <div class="card card-statistics">
-                                    <div class="card-header">
-                                        <div class="card-heading">
-                                            <h4 class="card-title">Receipt Form</h4>
-                                        </div>
-                                    </div>
                                     <div class="card-body">
-                                    <form id="mainSubmitButton" method="POST" onsubmit="return validateForm()">
-                                        <div class="form-row">
-                                            <!-- Exhibitor Field -->
-                                            <div class="form-group col-md-12">
-                                                <label for="exhibitorSelect">Exhibitors</label>
-                                                <select id="exhibitorSelect" name="exhibitorSelect" class="form-control" required>
-                                                    <option value="" hidden>Select an Exhibitor</option>
+                                        <div class="table-responsive">
+                                            <form method="POST" action="export.php">
+                                                <input type="hidden" name="selectedHall" value="<?php echo $selectedHall; ?>" />
+                                                <button type="submit" name="export" class="btn btn-primary">Export to CSV</button>
+                                            </form>
+                                            <table id="combined-table" class="display compact table table-striped table-bordered">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Receipt No.</th>
+                                                        <th>Company Name</th>
+                                                        <th>Hall Number</th>
+                                                        <th>Stand Number</th>
+                                                        <th>No. of Badges</th>
+                                                        <th>Total Amount</th>
+                                                        <th>Transaction Type</th>
+                                                        <th>Transaction Ref No.</th>
+                                                        <th>Created Date</th>
+                                                        <th>Cancelled Date</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
                                                     <?php
-                                                        $sql = "SELECT company_name FROM exhibitors order by company_name asc";
-                                                        $result = $conn->query($sql);
-
                                                         if ($result->num_rows > 0) {
                                                             while ($row = $result->fetch_assoc()) {
-                                                                echo "<option>" . $row['company_name'] . "</option>";
+                                                                $company_name = nl2br(wordwrap(htmlspecialchars($row['company_name'] ?? '', ENT_NOQUOTES), 15, "\n", true));
+                                                                echo "<tr>";
+                                                                echo "<td>" . htmlspecialchars($row['id']) . "</td>";
+                                                                echo "<td>" . $company_name . "</td>";
+                                                                echo "<td>" . htmlspecialchars($row['hall_no']) . "</td>";
+                                                                echo "<td>" . htmlspecialchars($row['stand_number']) . "</td>";
+                                                                echo "<td>" . htmlspecialchars($row['no_of_badges']) . "</td>";
+                                                                echo "<td>" . htmlspecialchars($row['total_amount']) . "</td>";
+                                                                echo "<td>" . htmlspecialchars($row['transaction_type']) . "</td>";
+                                                                echo "<td>" . htmlspecialchars($row['transaction_ref_no'] ?? '') . "</td>";
+                                                                echo "<td>" . htmlspecialchars($row['created_date']) . "</td>";
+                                                                echo "<td>" . htmlspecialchars($row['cancelled_date']) . "</td>";
+                                                                echo "</tr>";
                                                             }
                                                         } else {
-                                                            echo "<option>No exhibitors found</option>";
+                                                            echo "<tr><td colspan='10'>No data available</td></tr>";
                                                         }
                                                     ?>
-                                                </select>
-                                            </div>
-
-                                            <!-- Hall Number Field -->
-                                            <div class="form-group col-md-6">
-                                                <label for="hall_no">Hall Number</label>
-                                                <input type="text" id="hall_no" name="hall_no" class="form-control" readonly required>
-                                            </div>
-
-                                            <!-- Stand Number Field -->
-                                            <div class="form-group col-md-6">
-                                                <label for="stand_number">Stand Number</label>
-                                                <input type="text" id="stand_number" name="stand_number" class="form-control" readonly required>
-                                            </div>
-
-                                            <!-- Date Field -->
-                                            <div class="form-group col-md-6">
-                                                <label for="date">Date</label>
-                                                <input type="text" id="date" name="date" class="form-control" value="<?php echo date('Y-m-d'); ?>" readonly required>
-                                            </div>
-
-                                            <!-- Number of Badges Field -->
-                                            <div class="form-group col-md-6">
-                                                <label for="badge_no">No. of Badges</label>
-                                                <input type="number" id="badge_no" name="badge_no" class="form-control" min="1" required oninput="calculateTotal()">
-                                            </div>
-
-                                            <!-- Price per Badge (Fixed) -->
-                                            <div class="form-group col-md-6">
-                                                <label for="price_per_badge">Price per Badge</label>
-                                                <input type="text" id="price_per_badge" name="price_per_badge" class="form-control" value="100" readonly required>
-                                            </div>
-
-                                            <!-- Total Amount Field -->
-                                            <div class="form-group col-md-6">
-                                                <label for="total_amount">Total Amount</label>
-                                                <input type="text" id="total_amount" name="total_amount" class="form-control" readonly required>
-                                            </div>
-                                            
-                                            <!-- Transaction Type Field -->
-                                            <div class="form-group col-md-6">
-                                                <label for="transaction_type">Transaction Type </label>
-                                                <select id="transaction_type" name="transaction_type" class="form-control" required>
-                                                    <option value="" hidden>Select Transaction Type</option>
-                                                    <option>UPI</option>
-                                                    <option>Cash</option>
-                                                    <option>Card</option>
-                                                </select>
-                                            </div> 
-
-                                            <!-- Transaction Ref No. Field -->
-                                            <div class="form-group col-md-6">
-                                                <label for="transaction_ref_no">Transaction Ref No.</label>
-                                                <input type="text" id="transaction_ref_no" name="transaction_ref_no" class="form-control" required>
-                                            </div>                                           
+                                                </tbody>
+                                            </table>
                                         </div>
-
-                                        <div style="text-align: center;">
-                                            <button type="submit" id="submit" class="btn btn-primary">Submit</button>
-                                        </div>
-                                    </form>
                                     </div>
                                 </div>
                             </div>
                         </div>
+                        <!-- end row -->
                     </div>
+                    <!-- end container-fluid -->
                 </div>
                 <!-- end app-main -->
             </div>
@@ -386,125 +323,30 @@
     <!-- custom app -->
     <script src="assets/js/app.js"></script>
 
-    <!-- Initialize Select2 -->
     <script>
         $(document).ready(function() {
             $('.mobile-toggle').click(function() {
                 $('.mobile-menu').toggleClass('active');
             });
 
-            $('#exhibitorSelect').select2();
-            $('#exhibitorSelect').change(function() {
-                var selectedCompany = $(this).val();
-                
-                $.ajax({
-                    url: 'get_exhibitor_details.php',
-                    type: 'GET',
-                    data: { company_name: selectedCompany },
-                    success: function(response) {
-                        if (response) {
-                            $('#hall_no').val(response.hall_no);
-                            $('#stand_number').val(response.stand_number);
-                        } else {
-                            alert("No data found for the selected exhibitor.");
-                        }
-                    },
-                    error: function() {
-                        alert("Error retrieving data.");
+            var table = $('#combined-table').DataTable({
+                "bLengthChange": false,
+                "searching": true,
+                "bPaginate": true,
+                "bSortable": true,
+                "order": [[0, 'desc']],
+                "columnDefs": [
+                    {
+                        "targets": [8],  
+                        "type": "date"
                     }
-                });
-            });
-
-            function validateForm() {
-                // Validate receipt_no (even though it's readonly, we ensure it has a value)
-                var receiptNo = document.getElementById('receipt_no').value;
-                if (receiptNo === '') {
-                    alert('Receipt Number is required.');
-                    return false;
-                }
-
-                // Validate exhibitorSelect
-                var exhibitorSelect = document.getElementById('exhibitorSelect').value;
-                if (exhibitorSelect === '') {
-                    alert('Please select an exhibitor.');
-                    return false;
-                }
-
-                // Validate hall_no
-                var hallNo = document.getElementById('hall_no').value;
-                if (hallNo === '') {
-                    alert('Hall Number is required.');
-                    return false;
-                }
-
-                // Validate stand_number
-                var standNumber = document.getElementById('stand_number').value;
-                if (standNumber === '') {
-                    alert('Stand Number is required.');
-                    return false;
-                }
-
-                // Validate badge_no
-                var badgeNo = document.getElementById('badge_no').value;
-                if (badgeNo === '' || badgeNo <= 0) {
-                    alert('Please enter a valid number of badges.');
-                    return false;
-                }
-
-                // Validate transaction_type
-                var transactionType = document.getElementById('transaction_type').value;
-                if (transactionType === '') {
-                    alert('Please select a transaction type.');
-                    return false;
-                }
-
-                // Validate transaction_ref_no
-                var transactionRefNo = document.getElementById('transaction_ref_no').value;
-                if (transactionType === 'UPI' && transactionRefNo === '') {
-                    alert('Transaction Reference Number is required for UPI.');
-                    return false;
-                }
-
-                // If all validations pass
-                return true;
-            }
-
-            function toggleTransactionRefNo() {
-                var transactionType = document.getElementById('transaction_type').value;
-                var transactionRefNoField = document.getElementById('transaction_ref_no');
-                
-                if (transactionType === 'UPI') {
-                    transactionRefNoField.disabled = false;
-                    transactionRefNoField.required = true;
-                } else {
-                    transactionRefNoField.disabled = true;
-                    transactionRefNoField.required = false;
-                }
-            }
-
-            document.getElementById('transaction_type').addEventListener('change', toggleTransactionRefNo);
-
-            $('#mainSubmitButton').on('submit', function(event) {
-                event.preventDefault();
-
-                var formData = new FormData(this);
-                
-                $.ajax({
-                    url: "process_form.php",
-                    type: "POST",
-                    data: formData,
-                    processData: false,
-                    contentType: false,
-                    success: function(response) {
-                        alert('Receipt created successfully');
-                        location.reload();
-                    },
-                    error: function(xhr, status, error) {
-                        alert('Failed to create receipt ' + error);
-                    }
-                });
+                ]
             });
         });
     </script>
 </body>
 </html>
+
+<?php
+    $conn->close();
+?>

@@ -63,6 +63,8 @@
                 $badge_no, $total_amount, $transaction_type, $transaction_ref_no);
 
             if ($stmt->execute()) {
+                header("Location: display_receipt.php?id=$receipt_no");
+                exit();
                 echo json_encode(['status' => 'success', 'message' => 'Receipt saved successfully.']);
             } else {
                 echo json_encode(['status' => 'error', 'message' => 'Error saving the receipt: ' . $stmt->error]);

@@ -11,7 +11,7 @@
     include 'connect.php';
 
     //Total No. of badges
-    $query = "SELECT COUNT(id) as badge_count 
+    $query = "SELECT SUM(no_of_badges) as badge_count 
             FROM receipts 
             WHERE cancelled = 0";
 
@@ -35,7 +35,7 @@
     }
 
     //Total Cancelled Badges
-    $query1 = "SELECT COUNT(id) as cancelled_count 
+    $query1 = "SELECT SUM(no_of_badges) as cancelled_count 
             FROM receipts 
             WHERE cancelled = 1";
 
@@ -57,6 +57,100 @@
         $row = $total_stmt1->fetch_assoc();
         $cancelled_amount = $row['cancelled_amount'];
     }
+
+    //Total Issued Receipts
+    $query2 = "SELECT COUNT(id) as issued_receipt
+            FROM receipts 
+            WHERE cancelled = 0";
+
+    $stmt2 = $conn->query($query2);
+    $issued_receipts = 0;
+    if ($stmt2->num_rows > 0) {
+        $row = $stmt2->fetch_assoc();
+        $issued_receipts = $row['issued_receipt'];
+    }
+
+    //Total Cancelled Receipts
+    $query3 = "SELECT COUNT(id) as cancelled_receipt
+            FROM receipts 
+            WHERE cancelled = 1";
+
+    $stmt3 = $conn->query($query3);
+    $cancelled_receipts = 0;
+    if ($stmt3->num_rows > 0) {
+        $row = $stmt3->fetch_assoc();
+        $cancelled_receipts = $row['cancelled_receipt'];
+    }
+
+    //Issued data by date
+    $issued_data = "
+        SELECT DATE(created_date) AS created_date, COUNT(*) AS total_value
+        FROM receipts
+        WHERE cancelled = 0
+        GROUP BY DATE(created_date)
+        ORDER BY created_date
+    ";
+
+    $result_issued_data = $conn->query($issued_data);
+    if (!$result_issued_data) {
+        die('Query failed: ' . $conn->error);
+    }
+
+    $dataIssued = [];
+    while ($row = $result_issued_data->fetch_assoc()) {
+        $dataIssued[] = [
+            'date' => $row['created_date'],
+            'value' => (float)$row['total_value']
+        ];
+    }
+
+    //Cancelled Data by date
+    $cancelled_data = "
+        SELECT DATE(created_date) AS created_date, COUNT(*) AS total_value
+        FROM receipts
+        WHERE cancelled = 1
+        GROUP BY DATE(created_date)
+        ORDER BY created_date
+    ";
+
+    $result_cancelled_data = $conn->query($cancelled_data);
+    if (!$result_issued_data) {
+        die('Query failed: ' . $conn->error);
+    }
+
+    $dataCancelled = [];
+    while ($row = $result_cancelled_data->fetch_assoc()) {
+        $dataCancelled[] = [
+            'date' => $row['created_date'],
+            'value' => (float)$row['total_value']
+        ];
+    }
+
+    //Issued, Amount, Cancelled, Amount
+    $query4 = "SELECT 
+        DATE(created_date) AS created_date, 
+        SUM(CASE WHEN cancelled = 0 THEN no_of_badges ELSE 0 END) AS issued_badges,
+        SUM(CASE WHEN cancelled = 0 THEN total_amount ELSE 0 END) AS issued_amount,
+        SUM(CASE WHEN cancelled = 1 THEN no_of_badges ELSE 0 END) AS cancelled_badges,
+        SUM(CASE WHEN cancelled = 1 THEN total_amount ELSE 0 END) AS cancelled_amount
+    FROM receipts
+    GROUP BY DATE(created_date)
+    ORDER BY DATE(created_date)";
+
+    $result1 = $conn->query($query4);
+    $Data = [];
+
+    while ($row = $result1->fetch_assoc()) {
+        $Data[] = [
+            'created_date' => $row['created_date'],
+            'issued' => (int)$row['issued_badges'],
+            'iamount' => (int)$row['issued_amount'],
+            'cancelled' => (int)$row['cancelled_badges'],
+            'camount' => (int)$row['cancelled_amount']
+        ];
+    }
+
+    $DataJson = json_encode($Data);
 ?>
 
 <!DOCTYPE html>
@@ -105,8 +199,8 @@
                             <ul>
                                 <li><a href="index.php">Dashboard</a></li>
                                 <li><a href="receipt-form.php">Create New Receipt</a></li>
-                                <li><a href="reprint.php">Re-print Receipt</a></li>
-                                <li><a href="cancel-receipt.php">Cancel Receipt</a></li>
+                                <li><a href="re-print.php">Re-print Receipt</a></li>
+                                <li><a href="cancel-receipt.php">Issued Receipts</a></li>
                                 <li><a href="cancel.php">Cancelled Receipts</a></li>
                                 <li><a href="exhibitors-list.php">Exhibitors List</a></li>
                             </ul>
@@ -125,7 +219,7 @@
                     <div class="collapse navbar-collapse" id="navbarSupportedContent">
                         <div class="navigation d-flex">
                             <ul class="navbar-nav nav-right ml-auto">
-                                <li class="nav-item dropdown">
+                                <!-- <li class="nav-item dropdown">
                                     <a class="nav-link dropdown-toggle" href="javascript:void(0)" id="navbarDropdown3" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                                         <i class="fe fe-bell"></i>
                                         <span class="notify">
@@ -136,9 +230,6 @@
                                     <div class="dropdown-menu extended animated fadeIn" aria-labelledby="navbarDropdown">
                                         <ul>
                                             <li class="dropdown-header bg-gradient p-4 text-white text-left">Notifications
-                                                <!-- <a href="#" class="float-right btn btn-square btn-inverse-light btn-xs m-0">
-                                                    <span class="font-13"> Clear all</span>
-                                                </a> -->
                                             </li>
                                             <li class="dropdown-body min-h-240 nicescroll">
                                                 <ul class="scrollbar scroll_dark max-h-240">
@@ -181,12 +272,9 @@
                                                     <?php endif; ?>
                                                 </ul>
                                             </li>
-                                            <!-- <li class="dropdown-footer">
-                                                <a class="font-13" href="javascript:void(0)"> View All Notifications </a>
-                                            </li> -->
                                         </ul>
                                     </div>
-                                </li>
+                                </li> -->
 
                                 <li class="nav-item dropdown user-profile">
                                     <a href="javascript:void(0)" class="nav-link dropdown-toggle " id="navbarDropdown4" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
@@ -232,7 +320,7 @@
                             </li>
                             <li><a href="receipt-form.php" aria-expanded="false"><i class="nav-icon ti ti-pencil-alt"></i><span class="nav-title">Create New Receipt</span></a> </li>
                             <li><a href="re-print.php" aria-expanded="false"><i class="nav-icon ti ti-hand-open"></i><span class="nav-title">Re-print Receipt</span></a> </li>
-                            <li><a href="cancel.php" aria-expanded="false"><i class="nav-icon ti ti-email"></i><span class="nav-title">Cancel Receipt</span></a> </li>
+                            <li><a href="cancel.php" aria-expanded="false"><i class="nav-icon ti ti-email"></i><span class="nav-title">Issued Receipts</span></a> </li>
                             <li>
                                 <a href="cancel-receipt.php" aria-expanded="false">
                                     <i class="nav-icon ti ti-layout-column3-alt"></i>
@@ -284,15 +372,15 @@
                                 <div class="card card-statistics h-100 m-b-0 bg-pink">
                                     <div class="card-body">
                                         <h2 class="text-white mb-0"><?php echo $no_of_badges; ?></h2>
-                                        <p class="text-white">Total Badges</p>
+                                        <p class="text-white">Total Issued Badges</p>
                                     </div>
                                 </div>
                             </div>
                             <div class="col-xs-6 col-xxl-3 m-b-30">
                                 <div class="card card-statistics h-100 m-b-0 bg-primary">
                                     <div class="card-body">
-                                        <h2 class="text-white mb-0"><?php echo $total_amount; ?></h2>
-                                        <p class="text-white">Total Amount </p>
+                                        <h2 class="text-white mb-0"><span>&#8377; </span> <?php echo number_format($total_amount); ?>/-</h2>
+                                        <p class="text-white">Total Revenue Generated </p>
                                     </div>
                                 </div>
                             </div>
@@ -300,14 +388,14 @@
                                 <div class="card card-statistics h-100 m-b-0 bg-orange">
                                     <div class="card-body">
                                         <h2 class="text-white mb-0"><?php echo $cancelled_badges; ?></h2>
-                                        <p class="text-white">Total Cancelled Receipts </p>
+                                        <p class="text-white">Total Cancelled Badges </p>
                                     </div>
                                 </div>
                             </div>
                             <div class="col-xs-6 col-xxl-3 m-b-30">
                                 <div class="card card-statistics h-100 m-b-0 bg-info">
                                     <div class="card-body">
-                                        <h2 class="text-white mb-0"><?php echo $cancelled_amount; ?></h2>
+                                    <h2 class="text-white mb-0"><span>&#8377; </span> <?php echo number_format($cancelled_amount); ?>/-</h2>
                                         <p class="text-white">Total Amount Cancelled</p>
                                     </div>
                                 </div>
@@ -321,11 +409,11 @@
                                             <div class="w-100">
                                                 <div class="row p-3">
                                                     <div class="col">
-                                                        <h3 class="mb-0"><?php echo $totalIncidents; ?></h3>
+                                                        <h3 class="mb-0"><?php echo $issued_receipts; ?></h3>
                                                         <!-- <small class="d-block">Last 6 months</small> -->
                                                     </div>
                                                     <div class="col text-right">
-                                                        <h5 class="text-muted mb-0">Total Incidents</h5>
+                                                        <h5 class="text-muted mb-0">Issued Receipts</h5>
                                                     </div>
                                                 </div>
                                                 <div class="apexchart-wrapper">
@@ -343,11 +431,11 @@
                                             <div class="w-100">
                                                 <div class="row p-3">
                                                     <div class="col">
-                                                        <h3 class="mb-0"><?php echo $totalcritical; ?></h3>
+                                                        <h3 class="mb-0"><?php echo $cancelled_receipts; ?></h3>
                                                         <!-- <small class="d-block">Past 6 months</small> -->
                                                     </div>
                                                     <div class="col text-right">
-                                                        <h5 class="text-muted mb-0">Critical Incidents</h5>
+                                                        <h5 class="text-muted mb-0">Cancelled Receipts</h5>
                                                     </div>
                                                 </div>
                                                 <div class="apexchart-wrapper">
@@ -358,205 +446,22 @@
                                     </div>
                                 </div>
                             </div>
-
-                            <div class="col-sm-6 col-xxl-3">
-                                <div class="card card-statistics ecommerce-contant overflow-h">
-                                    <div class="card-body p-0">
-                                        <div class="d-flex m-b-0 ecommerce-contant-text h-100">
-                                            <div class="w-100">
-                                                <div class="w-100">
-                                                    <div class="row p-3">
-                                                        <div class="col">
-                                                            <h3 class="mb-0"><?php echo $totalClosedIncidents; ?></h3>
-                                                            <!-- <small class="d-block">Last 6 months</small> -->
-                                                        </div>
-                                                        <div class="col text-right">
-                                                            <h5 class="text-muted mb-0">Closed Incidents</h5>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div class="apexchart-wrapper">
-                                                    <div id="ecommercedemo2" class="chart-fit"></div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-sm-6 col-xxl-3">
-                                <div class="card card-statistics ecommerce-contant overflow-h">
-                                    <div class="card-body p-0">
-                                        <div class="d-flex m-b-0 ecommerce-contant-text h-100">
-                                            <div class="w-100">
-                                                <div class="row p-3">
-                                                    <div class="col">
-                                                        <h3 class="mb-0"><?php echo $totalOpenIncidents; ?></h3>
-                                                        <!-- <small class="d-block">Last 6 months</small> -->
-                                                    </div>
-                                                    <div class="col text-right">
-                                                        <h5 class="text-muted mb-0">Open Incidents</h5>
-                                                    </div>
-                                                </div>
-                                                <div class="apexchart-wrapper">
-                                                    <div id="ecommercedemo4" class="chart-fit"></div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
                         </div>
                         <div class="row">
-                            <div class="col-xxl-8 m-b-30">
-                                <div class="card card-statistics h-100 mb-0">
-                                    <div class="card-header d-flex align-items-center justify-content-between">
+                            <div class="col-xxl-5 m-b-30">
+                                <div class="card card-statistics">
+                                    <div class="card-header">
                                         <div class="card-heading">
-                                            <h4 class="card-title">Top 5 Severe Open Incidents</h4>
-                                        </div>
-                                    </div>
-                                    <div class="card-body scrollbar scroll_dark pt-0" style="max-height: 350px;">
-                                        <div class="table-responsive">
-                                            <table id="datatable" class="display compact table table-striped table-bordered">
-                                                <thead>
-                                                    <tr>
-                                                        <th>Incident ID</th>
-                                                        <th>Company Name</th>
-                                                        <th>Incident</th>
-                                                        <th>Created Date</th>
-                                                        <th>Hall Number</th>
-                                                        <th>Stand Number</th>
-                                                        <th>Primary Email</th>
-                                                        <th>Secondary Email</th>
-                                                        <th>Criticality</th>
-                                                        <th>Resend Count</th>
-                                                        <th>Images</th>
-                                                        <th>Actions</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    <?php
-                                                        if ($result->num_rows > 0) {
-                                                            while ($row = $result->fetch_assoc()) {
-                                                                $incident_name = nl2br(wordwrap(htmlspecialchars($row['incident'] ?? ''), 15, "\n", true));
-                                                                $company_name = nl2br(wordwrap(htmlspecialchars($row['company_name'] ?? '', ENT_NOQUOTES), 15, "\n", true));
-                                                                echo "<tr>";
-                                                                echo "<td>" . htmlspecialchars($row['id']) . "</td>";
-                                                                echo "<td>" . $company_name . "</td>";
-                                                                echo "<td>" . $incident_name . "</td>";
-                                                                echo "<td>" . htmlspecialchars($row['incident_date']) . "</td>";
-                                                                echo "<td>" . htmlspecialchars($row['hall_no']) . "</td>";
-                                                                echo "<td>" . htmlspecialchars($row['stand_number']) . "</td>";
-                                                                echo "<td>" . htmlspecialchars($row['email']) . "</td>";
-                                                                echo "<td>" . htmlspecialchars($row['email1'] ?? '') . "</td>";
-                                                                $criticality = htmlspecialchars($row['criticality']);
-                                                                switch ($criticality) {
-                                                                    case 'Critical':
-                                                                        echo "<td><span class='badge badge-danger-inverse'>Critical</span></td>";
-                                                                        break;
-                                                                    case 'High':
-                                                                        echo "<td><span class='badge badge-warning-inverse'>High</span></td>";
-                                                                        break;
-                                                                    case 'Medium':
-                                                                        echo "<td><span class='badge badge-info-inverse'>Medium</span></td>";
-                                                                        break;
-                                                                    case 'Low':
-                                                                        echo "<td><span class='badge badge-success-inverse'>Low</span></td>";
-                                                                        break;
-                                                                    default:
-                                                                        echo "<td><span class='badge badge-secondary-inverse'>" .$criticality. "</span></td>";
-                                                                }
-                                                                echo "<td>" . htmlspecialchars($row['resend_count']) . "</td>";
-
-                                                                $images = htmlspecialchars($row['image_paths']);
-                                                                if (!empty($images)) {
-                                                                    $imageArray = explode(',', $images);
-                                                                    echo "<td>";
-                                                                    foreach ($imageArray as $image) {
-                                                                        echo "<a href='$image' target='_blank'><img src='$image' alt='Image' style='width:50px;height:50px; margin-right: 5px;'></a>";
-                                                                    }
-                                                                    echo "</td>";
-                                                                } else {
-                                                                    echo "<td>No images</td>";
-                                                                }
-
-                                                                echo "<td>
-                                                                    <input type='checkbox' class='include-secondary-email' data-email1='" . $row['email1'] . "'>
-                                                                    <button class='btn btn-sm btn-danger close-incident' data-id='" . $row['id'] . "'><span class='dashicons dashicons-no'></span></button>
-                                                                    <button class='btn btn-sm btn-primary resend-mail' 
-                                                                        data-id='" . $row['id'] . "' 
-                                                                        data-email='" . $row['email'] . "' 
-                                                                        data-email1='" . $row['email1'] . "' 
-                                                                        data-incident='" . htmlspecialchars($row['incident']) . "' 
-                                                                        data-criticality='" . htmlspecialchars($row['criticality']) . "' 
-                                                                        data-images='" . htmlspecialchars($row['image_paths']) . "' 
-                                                                        data-resend-count='" . $row['resend_count'] . "'>
-                                                                        <span class='dripicons dripicons-mail'></span>
-                                                                    </button>
-                                                                </td>";
-
-                                                                echo "</tr>";
-                                                            }
-                                                        } else {
-                                                            echo "<tr><td colspan='10'>No data available</td></tr>";
-                                                        }
-                                                    ?>
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="row">
-                            <div class="col-xxl-7 m-b-30">
-                                <div class="card card-statistics h-100 mb-0">
-                                    <div class="card-header d-flex justify-content-between">
-                                        <div class="card-heading">
-                                            <h4 class="card-title">Incidents Summary</h4>
+                                            <h4 class="card-title">Badges Summary (Date wise)</h4>
                                         </div>
                                     </div>
                                     <div class="card-body">
-                                        <!-- <h5>We only started collecting data from February 2019 </h5> -->
-                                        <div class="row mt-4">
-                                            <div class="col-lg-8">
-                                                <div class="morris-wrapper">
-                                                    <div id="morrisecommerce1" style="height: 260px;"></div>
-                                                </div>
-                                            </div>
-                                            <div class="col-lg-4 mt-4">
-                                                <div class="mb-3">
-                                                    <h3 class="mb-0"><?php echo $totalIncidents; ?></h3>
-                                                    <p class="mb-0 text-info">Total Incidents</p>
-                                                </div>
-                                                <div class="mb-3">
-                                                    <h3 class="mb-0"><?php echo $totalOpenIncidents; ?></h3>
-                                                    <p class="mb-0 text-primary">Open Incidents</p>
-                                                </div>
-                                                <div class="mb-3">
-                                                    <h3 class="mb-0"><?php echo $totalClosedIncidents; ?></h3>
-                                                    <p class="mb-0" style="color: #52dce5">Closed Incidents</p>
-                                                </div>
-                                            </div>
+                                        <div class="apexchart-wrapper">
+                                            <div id="apexdemo1"></div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                            <?php if ($selectedHall == 'All'): ?>
-                                <div class="col-xxl-5 m-b-30">
-                                    <div class="card card-statistics">
-                                        <div class="card-header">
-                                            <div class="card-heading">
-                                                <h4 class="card-title">Incidents Summary (Hall wise)</h4>
-                                            </div>
-                                        </div>
-                                        <div class="card-body">
-                                            <div class="apexchart-wrapper">
-                                                <div id="apexdemo1"></div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            <?php endif; ?>
                         </div>
                         <!-- end row -->
                     </div>
@@ -591,45 +496,22 @@
                 $('.mobile-menu').toggleClass('active');
             });
 
-            var table = $('#datatable').DataTable({
-                "bLengthChange": false,
-                "searching": true,
-                "bPaginate": true,
-                "bSortable": true,
-                "order": [[0, 'desc']]
-            });
+            var dataIssued = <?php echo json_encode($dataIssued); ?>;
+            var dataCancelled = <?php echo json_encode($dataCancelled); ?>;
 
-            var morrisecommerce1 = jQuery("#morrisecommerce1");
-            if (morrisecommerce1.length > 0) {
-                Morris.Donut({
-                    element: morrisecommerce1,
-                    data: [
-                        { label: "Total Incidents", value: <?php echo $totalIncidents; ?> },
-                        { label: "Open Incidents", value: <?php echo $totalOpenIncidents; ?> },
-                        { label: "Closed Incidents", value: <?php echo $totalClosedIncidents; ?> }
-                    ],
-                    colors: ['#45aaf2', '#8E54E9', '#52dce5']
-                });
-            }
+            var Data = <?php echo $DataJson; ?>;
+            var Date = [];
+            var issuedReceipts = [];
+            var iAmount = [];
+            var cancelledReceipts = [];
+            var cAmount = [];
 
-            var total_badges = <?php echo json_encode($total_badges); ?>;
-            var dataOpenLast6MonthsByDate = <?php echo json_encode($dataOpenLast6MonthsByDate); ?>;
-            var dataOpenLast6Months = <?php echo json_encode($dataOpenLast6Months); ?>;
-            var dataClosedLast6Months = <?php echo json_encode($dataClosedLast6Months); ?>;
-
-            var hallData = <?php echo $hallDataJson; ?>;
-            var halls = [];
-            var totalIncidents = [];
-            var openIncidents = [];
-            var closedIncidents = [];
-            var criticalIncidents = [];
-
-            hallData.forEach(function(hall) {
-                halls.push(hall.hall_no);
-                totalIncidents.push(hall.total);
-                openIncidents.push(hall.open);
-                closedIncidents.push(hall.closed);
-                criticalIncidents.push(hall.critical);
+            Data.forEach(function(Data) {
+                Date.push(Data.created_date);
+                issuedReceipts.push(Data.issued);
+                iAmount.push(Data.iamount);
+                cancelledReceipts.push(Data.cancelled);
+                cAmount.push(Data.camount);
             });
 
             var apexdemo1 = jQuery('#apexdemo1');
@@ -650,29 +532,29 @@
                             show: false
                         }
                     },
-                    colors: ['#FF5733', '#8E54E9', '#2bcbba', '#fbaf54'],
+                    colors: ['#2bcbba', '#8E54E9', '#FF5733', '#fbaf54'],
                     dataLabels: {
-                        enabled: true,
+                        enabled: false,
                     },
                     stroke: {
                         curve: 'smooth'
                     },
                     series: [
                         {
-                            name: "Total Incidents",
-                            data: totalIncidents
+                            name: "Issued Badges",
+                            data: issuedReceipts
                         },
                         {
-                            name: "Open Incidents",
-                            data: openIncidents
+                            name: "Total Revenue",
+                            data: iAmount
                         },
                         {
-                            name: "Closed Incidents",
-                            data: closedIncidents
+                            name: "Cancelled Badges",
+                            data: cancelledReceipts
                         },
                         {
-                            name: "Critical Incidents",
-                            data: criticalIncidents
+                            name: "Cancelled Amount",
+                            data: cAmount
                         }
                     ],
                     grid: {
@@ -686,17 +568,19 @@
                         size: 6
                     },
                     xaxis: {
-                        categories: halls,  // Dynamic hall names
+                        categories: Date,
                         title: {
-                            text: 'Hall Number'
+                            text: 'Date'
                         }
                     },
-                    yaxis: {
-                        title: {
-                            text: 'Number of Incidents'
-                        },
-                        min: 0
-                    },
+                    yaxis: [
+                        {
+                            title: {
+                                text: 'Number of Badges'
+                            },
+                            min: 0
+                        }
+                    ],
                     legend: {
                         position: 'top',
                         horizontalAlign: 'right',
@@ -710,139 +594,9 @@
                 chart.render();
             }
 
-            var apexdemo1 = jQuery('#apexdemo1');
-            if (apexdemo1.length > 0) {
-                var options = {
-                    chart: {
-                        type: 'bar',
-                        width: 120,
-                        height: 50,
-                        sparkline: {
-                            enabled: true
-                        }
-                    },
-                    colors: ['#8E54E9'],
-                    plotOptions: {
-                        bar: {
-                            columnWidth: '20%',
-                            endingShape: 'rounded',
-                        }
-                    },
-                    series: [{
-                        data: total_badges.counts
-                    }],
-                    labels: total_badges.dates,
-                    xaxis: {
-                        type: 'datetime',
-                        crosshairs: {
-                            width: 1
-                        }
-                    },
-                    tooltip: {
-                        fixed: { enabled: false },
-                        x: { show: true, format: 'dd MMM yyyy' },  // Show the date in tooltip
-                        y: {
-                            title: {
-                                formatter: function () {
-                                    return 'Badges: ';
-                                }
-                            }
-                        },
-                        marker: { show: false }
-                    },
-                    responsive: [
-                        {
-                            breakpoint: 360,
-                            options: {
-                                chart: { width: 60, height: 60 }
-                            }
-                        },
-                        {
-                            breakpoint: 480,
-                            options: {
-                                chart: { width: 100, height: 80 }
-                            }
-                        }
-                    ]
-                };
-
-                var chart = new ApexCharts(
-                    document.querySelector("#analytics7"),
-                    options
-                );
-                chart.render();
-            }
-
-            //Critical Incidents
-            var ecommercedemo1 = jQuery('#ecommercedemo1')
-            if (ecommercedemo1.length > 0) {
-
-                var randomizeArray = function (arg) {
-                    var array = arg.slice();
-                    var currentIndex = array.length,
-                        temporaryValue, randomIndex;
-
-                    while (0 !== currentIndex) {
-
-                        randomIndex = Math.floor(Math.random() * currentIndex);
-                        currentIndex -= 1;
-
-                        temporaryValue = array[currentIndex];
-                        array[currentIndex] = array[randomIndex];
-                        array[randomIndex] = temporaryValue;
-                    }
-
-                    return array;
-                }
-
-                var options = {
-                    chart: {
-                        type: 'area',
-                        height: 100,
-                        sparkline: {
-                            enabled: true,
-                            offsetY:25,
-                            offsetX:25,
-                        },
-                        },
-                        stroke: {
-                        curve: 'smooth',
-                        width: 3
-                        },
-                        fill: {
-                        opacity: 0.3,
-                        gradient: {
-                            enabled: true,
-                            shadeIntensity: 0.1,
-                            inverseColors: false,
-                            opacityFrom: 0.6,
-                            opacityTo: 0.2,
-                            stops: [20, 100, 100, 100]
-                        },
-                        },
-                        series: [{
-                            name: 'Critical Incidents',
-                            data: dataOpenLast6MonthsByDate.map(function(item) {
-                                return { x: item.incident_date, y: item.value };
-                            })
-                        }],
-                        yaxis: {
-                            min: 0
-                        },
-                        colors: ['#8E54E9'],
-                }
-
-                var chart = new ApexCharts(
-                    document.querySelector("#ecommercedemo1"),
-                    options
-                );
-
-                chart.render();
-            }
-
-            //Closed Incidents past 6 months
-            var ecommercedemo2 = jQuery('#ecommercedemo2')
-            if (ecommercedemo2.length > 0) {
+            //Issued Receipts
+            var ecommercedemo3 = jQuery('#ecommercedemo3')
+            if (ecommercedemo3.length > 0) {
 
                 var randomizeArray = function (arg) {
                     var array = arg.slice();
@@ -888,8 +642,8 @@
                         },
                     },
                     series: [{
-                        name: 'Closed Incidents',
-                        data: dataClosedLast6Months.map(function(item) {
+                        name: 'Issued Receipts',
+                        data: dataIssued.map(function(item) {
                             return { x: item.date, y: item.value };
                         })
                     }],
@@ -910,20 +664,20 @@
                             show: false
                         },
                     },
-                    colors: ['#fbaf54'],
+                    colors: ['#32b432'],
                 }
 
                 var chart = new ApexCharts(
-                    document.querySelector("#ecommercedemo2"),
+                    document.querySelector("#ecommercedemo3"),
                     options
                 );
 
                 chart.render();
             }
 
-            //Open incidents last 6 months
-            var ecommercedemo4 = jQuery('#ecommercedemo4')
-            if (ecommercedemo4.length > 0) {
+            //Cancelled Receipts
+            var ecommercedemo1 = jQuery('#ecommercedemo1')
+            if (ecommercedemo1.length > 0) {
 
                 var randomizeArray = function (arg) {
                     var array = arg.slice();
@@ -969,8 +723,8 @@
                         },
                     },
                     series: [{
-                        name: 'Open Incidents',
-                        data: dataOpenLast6Months.map(function(item) {
+                        name: 'Cancelled Receipts',
+                        data: dataCancelled.map(function(item) {
                             return { x: item.date, y: item.value };
                         })
                     }],
@@ -991,11 +745,11 @@
                             show: false
                         },
                     },
-                    colors: ['#32b432'],
+                    colors: ['#FF5733'],
                 }
 
                 var chart = new ApexCharts(
-                    document.querySelector("#ecommercedemo4"),
+                    document.querySelector("#ecommercedemo1"),
                     options
                 );
 
