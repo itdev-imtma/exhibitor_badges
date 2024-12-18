@@ -10,10 +10,10 @@
     
     include 'connect.php';
 
-        $sql = "SELECT i.id, i.hall_no, i.stand_number, i.no_of_badges, i.total_amount, i.transaction_type, i.transaction_ref_no, 
+        $sql = "SELECT i.id, i.receipt_no, i.hall_no, i.stand_number, i.no_of_badges, i.total_amount, i.transaction_type, i.transaction_ref_no, 
                 i.created_date, e.company_name
                 FROM receipts i LEFT JOIN exhibitors e ON i.exhibitor_id = e.exhibitor_id
-                WHERE i.cancelled = 0";
+                WHERE i.status = 'Issued' and cancelled = 0 order by i.id desc";
 
     $result = $conn->query($sql);
 ?>
@@ -73,6 +73,7 @@
                                 <li><a href="cancel-receipt.php">Issued Receipts</a></li>
                                 <li><a href="cancel.php">Cancelled Receipts</a></li>
                                 <li><a href="exhibitors-list.php">Exhibitors List</a></li>
+                                <li><a href="consolidated.php">Consolidated List</a></li>
                             </ul>
                         </div>
                         <a class="navbar-brand" href="index.php">
@@ -89,7 +90,7 @@
                     <div class="collapse navbar-collapse" id="navbarSupportedContent">
                         <div class="navigation d-flex">
                             <ul class="navbar-nav nav-right ml-auto">
-                            <li class="nav-item dropdown">
+                                <!-- <li class="nav-item dropdown">
                                     <a class="nav-link dropdown-toggle" href="javascript:void(0)" id="navbarDropdown3" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                                         <i class="fe fe-bell"></i>
                                         <span class="notify">
@@ -100,9 +101,6 @@
                                     <div class="dropdown-menu extended animated fadeIn" aria-labelledby="navbarDropdown">
                                         <ul>
                                             <li class="dropdown-header bg-gradient p-4 text-white text-left">Notifications
-                                                <!-- <a href="#" class="float-right btn btn-square btn-inverse-light btn-xs m-0">
-                                                    <span class="font-13"> Clear all</span>
-                                                </a> -->
                                             </li>
                                             <li class="dropdown-body min-h-240 nicescroll">
                                                 <ul class="scrollbar scroll_dark max-h-240">
@@ -145,12 +143,9 @@
                                                     <?php endif; ?>
                                                 </ul>
                                             </li>
-                                            <!-- <li class="dropdown-footer">
-                                                <a class="font-13" href="javascript:void(0)"> View All Notifications </a>
-                                            </li> -->
                                         </ul>
                                     </div>
-                                </li>
+                                </li> -->
                                 <li class="nav-item dropdown user-profile">
                                     <a href="javascript:void(0)" class="nav-link dropdown-toggle " id="navbarDropdown4" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                                         <img src="assets/img/user.png" alt="avtar-img">
@@ -208,6 +203,12 @@
                                     <span class="nav-title">Exhibitors List</span>
                                 </a>
                             </li>
+                            <li>
+                                <a href="consolidated.php" aria-expanded="false">
+                                    <i class="nav-icon ti ti-layout-column3-alt"></i>
+                                    <span class="nav-title">Consolidated List</span>
+                                </a>
+                            </li>
                         </ul>
                     </div>
                     <!-- end sidebar-nav -->
@@ -248,13 +249,10 @@
                                 <div class="card card-statistics">
                                     <div class="card-body">
                                         <div class="table-responsive">
-                                            <form method="POST" action="export.php">
-                                                <input type="hidden" name="selectedHall" value="<?php echo $selectedHall; ?>" />
-                                                <button type="submit" name="export" class="btn btn-primary">Export to CSV</button>
-                                            </form>
                                             <table id="combined-table" class="display compact table table-striped table-bordered">
                                                 <thead>
                                                     <tr>
+                                                        <th style="display:none;">ID</th>
                                                         <th>Receipt No.</th>
                                                         <th>Company Name</th>
                                                         <th>Hall Number</th>
@@ -273,7 +271,8 @@
                                                             while ($row = $result->fetch_assoc()) {
                                                                 $company_name = nl2br(wordwrap(htmlspecialchars($row['company_name'] ?? '', ENT_NOQUOTES), 15, "\n", true));
                                                                 echo "<tr>";
-                                                                echo "<td>" . htmlspecialchars($row['id']) . "</td>";
+                                                                echo "<td style='display:none;'>" . htmlspecialchars($row['id']) . "</td>";
+                                                                echo "<td>" . htmlspecialchars($row['receipt_no']) . "</td>";
                                                                 echo "<td>" . $company_name . "</td>";
                                                                 echo "<td>" . htmlspecialchars($row['hall_no']) . "</td>";
                                                                 echo "<td>" . htmlspecialchars($row['stand_number']) . "</td>";
@@ -328,10 +327,12 @@
 
     <script>
         $(document).ready(function() {
+            // Toggle mobile menu visibility
             $('.mobile-toggle').click(function() {
                 $('.mobile-menu').toggleClass('active');
             });
 
+            // Initialize DataTable
             var table = $('#combined-table').DataTable({
                 "bLengthChange": false,
                 "searching": true,
@@ -340,36 +341,57 @@
                 "order": [[0, 'desc']],
                 "columnDefs": [
                     {
-                        "targets": [8],  
+                        "targets": [8],  // Apply date sorting to column 8
                         "type": "date"
                     }
                 ]
             });
-            
+
+            // Handle the cancel receipt action
             $('.cancel-receipt').on('click', function() {
                 var receiptId = $(this).data('id');
-
+                $('.loader').show();
                 if (confirm("Are you sure you want to cancel this receipt?")) {
                     $.ajax({
                         url: 'cancel_receipt.php',
                         type: 'POST',
-                        data: {
-                            receipt_id: receiptId
-                        },
+                        data: { receipt_id: receiptId },
                         success: function(response) {
-                            if (response === 'success') {
-                                alert("Receipt has been canceled.");
-                                location.reload();
+                            $('.loader').hide();
+                            console.log(response);
+                            if (response.status === 'success') {
+                                alert('Receipt has been cancelled successfully!');
+
+                                // Set the flag in sessionStorage before redirect
+                                sessionStorage.setItem('cancelledReceipt', 'true');
+                                
+                                // Redirect to the new URL
+                                window.location.href = response.redirect_url;
+
+                                // Modify the browser history (replace the state to avoid back button issues)
+                                history.replaceState(null, '', response.redirect_url);
                             } else {
-                                alert("Failed to cancel the receipt. Please try again.");
+                                $('.loader').hide();
+                                alert('Failed to cancel the receipt: ' + response.message);
+                                location.reload();
                             }
                         },
-                        error: function() {
-                            alert("An error occurred. Please try again.");
+                        error: function(xhr, status, error) {
+                            $('.loader').hide();
+                            console.log('AJAX Error:', error);
+                            alert('An error occurred. Please try again.');
+                            location.reload();
                         }
                     });
                 }
             });
+
+            // Check if the page was loaded after the redirect
+            if (sessionStorage.getItem('cancelledReceipt') === 'true') {
+                // If the flag is present, reload the page and remove the flag
+                sessionStorage.removeItem('cancelledReceipt');
+                location.reload(); // Force reload the page
+            }
         });
     </script>
 </body>

@@ -10,10 +10,10 @@
     
     include 'connect.php';
 
-        $sql = "SELECT i.id, i.hall_no, i.stand_number, i.no_of_badges, i.total_amount, i.transaction_type, i.transaction_ref_no, 
+        $sql = "SELECT i.id, i.receipt_no, i.hall_no, i.stand_number, i.no_of_badges, i.total_amount, i.transaction_type, i.transaction_ref_no, 
                 i.created_date, i.cancelled_date, e.company_name
                 FROM receipts i LEFT JOIN exhibitors e ON i.exhibitor_id = e.exhibitor_id
-                WHERE i.cancelled = 1";
+                WHERE i.status = 'Cancelled' order by i.receipt_no desc";
 
     $result = $conn->query($sql);
 ?>
@@ -73,6 +73,7 @@
                                 <li><a href="cancel-receipt.php">Issued Receipts</a></li>
                                 <li><a href="cancel.php">Cancelled Receipts</a></li>
                                 <li><a href="exhibitors-list.php">Exhibitors List</a></li>
+                                <li><a href="consolidated.php">Consolidated List</a></li>
                             </ul>
                         </div>
                         <a class="navbar-brand" href="index.php">
@@ -89,7 +90,7 @@
                     <div class="collapse navbar-collapse" id="navbarSupportedContent">
                         <div class="navigation d-flex">
                             <ul class="navbar-nav nav-right ml-auto">
-                            <li class="nav-item dropdown">
+                                <!-- <li class="nav-item dropdown">
                                     <a class="nav-link dropdown-toggle" href="javascript:void(0)" id="navbarDropdown3" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                                         <i class="fe fe-bell"></i>
                                         <span class="notify">
@@ -100,9 +101,6 @@
                                     <div class="dropdown-menu extended animated fadeIn" aria-labelledby="navbarDropdown">
                                         <ul>
                                             <li class="dropdown-header bg-gradient p-4 text-white text-left">Notifications
-                                                <!-- <a href="#" class="float-right btn btn-square btn-inverse-light btn-xs m-0">
-                                                    <span class="font-13"> Clear all</span>
-                                                </a> -->
                                             </li>
                                             <li class="dropdown-body min-h-240 nicescroll">
                                                 <ul class="scrollbar scroll_dark max-h-240">
@@ -145,12 +143,9 @@
                                                     <?php endif; ?>
                                                 </ul>
                                             </li>
-                                            <!-- <li class="dropdown-footer">
-                                                <a class="font-13" href="javascript:void(0)"> View All Notifications </a>
-                                            </li> -->
                                         </ul>
                                     </div>
-                                </li>
+                                </li> -->
                                 <li class="nav-item dropdown user-profile">
                                     <a href="javascript:void(0)" class="nav-link dropdown-toggle " id="navbarDropdown4" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                                         <img src="assets/img/user.png" alt="avtar-img">
@@ -208,6 +203,12 @@
                                     <span class="nav-title">Exhibitors List</span>
                                 </a>
                             </li>
+                            <li>
+                                <a href="consolidated.php" aria-expanded="false">
+                                    <i class="nav-icon ti ti-layout-column3-alt"></i>
+                                    <span class="nav-title">Consolidated List</span>
+                                </a>
+                            </li>
                         </ul>
                     </div>
                     <!-- end sidebar-nav -->
@@ -248,13 +249,10 @@
                                 <div class="card card-statistics">
                                     <div class="card-body">
                                         <div class="table-responsive">
-                                            <form method="POST" action="export.php">
-                                                <input type="hidden" name="selectedHall" value="<?php echo $selectedHall; ?>" />
-                                                <button type="submit" name="export" class="btn btn-primary">Export to CSV</button>
-                                            </form>
                                             <table id="combined-table" class="display compact table table-striped table-bordered">
                                                 <thead>
                                                     <tr>
+                                                        <th style="display:none;">ID</th>
                                                         <th>Receipt No.</th>
                                                         <th>Company Name</th>
                                                         <th>Hall Number</th>
@@ -273,7 +271,8 @@
                                                             while ($row = $result->fetch_assoc()) {
                                                                 $company_name = nl2br(wordwrap(htmlspecialchars($row['company_name'] ?? '', ENT_NOQUOTES), 15, "\n", true));
                                                                 echo "<tr>";
-                                                                echo "<td>" . htmlspecialchars($row['id']) . "</td>";
+                                                                echo "<td style='display:none;'>" . htmlspecialchars($row['id']) . "</td>";
+                                                                echo "<td>" . htmlspecialchars($row['receipt_no']) . "</td>";
                                                                 echo "<td>" . $company_name . "</td>";
                                                                 echo "<td>" . htmlspecialchars($row['hall_no']) . "</td>";
                                                                 echo "<td>" . htmlspecialchars($row['stand_number']) . "</td>";
@@ -334,7 +333,7 @@
                 "searching": true,
                 "bPaginate": true,
                 "bSortable": true,
-                "order": [[0, 'desc']],
+                "order": [[1, 'desc']],
                 "columnDefs": [
                     {
                         "targets": [8],  

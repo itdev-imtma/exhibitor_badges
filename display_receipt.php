@@ -135,8 +135,8 @@
         <meta http-equiv="X-UA-Compatible" content="IE=edge" />
         <!-- app favicon -->
         <link rel="shortcut icon" href="assets/img/imtex_favicon.png">
-        <link rel="stylesheet" type="text/css" href="http://202.62.70.245:8082/css/style.css" />
-        <script type="text/javascript" language="javascript" src="http://202.62.70.245:8082/js/jquery.js"></script>
+        <link rel="stylesheet" type="text/css" href="style.css" />
+        <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
         <style>
             .receipt_font {
                 font-family:HELVETICA; font-size:14px;
@@ -188,10 +188,23 @@
                                             <td style="border-bottom:1px solid #000;border-right:0px solid #000;" width="179" align="center" valign="middle" class="receipt_font"><b>Amount (Rs.)</b> </td>
                                         </tr>
                                         <tr height="45">
-                                            <td style="border-bottom:1px solid #000;border-right:1px solid #000;" align="center" valign="middle" class="receipt_font"><strong><?= htmlspecialchars($receipt['id']) ?></strong></td>
+                                            <td style="border-bottom:1px solid #000;border-right:1px solid #000;" align="center" valign="middle" class="receipt_font"><strong><?= htmlspecialchars($receipt['receipt_no']) ?></strong></td>
                                             <td style="border-bottom:1px solid #000;border-right:1px solid #000;" align="center" valign="middle" class="receipt_font"><b><?= htmlspecialchars(date('d-m-Y', strtotime($receipt['created_date']))) ?></b></td>
                                             <td style="border-bottom:1px solid #000;border-right:0px solid #000;" align="center" valign="middle" class="receipt_font">
-                                                <b><?= htmlspecialchars($receipt['total_amount'])?>/-</b>
+                                            <?php 
+                                                $cancelled = isset($receipt['cancelled']) ? $receipt['cancelled'] : null;
+                                                $total_amount = isset($receipt['total_amount']) ? $receipt['total_amount'] : null;
+
+                                                if ($cancelled === 1) {
+                                                    // Ensure 'total_amount' is not null
+                                                    $total_amount_display = $total_amount !== null ? htmlspecialchars($total_amount) : '0'; // Default to 0 if null
+                                                    echo '<b>- ' . $total_amount_display . '/-</b>';
+                                                } else {
+                                                    // Ensure 'total_amount' is not null
+                                                    $total_amount_display = $total_amount !== null ? htmlspecialchars($total_amount) : '0'; // Default to 0 if null
+                                                    echo '<b>' . $total_amount_display . '/-</b>';
+                                                }
+                                            ?>
                                             </td>
                                         </tr>
                                     </table>
@@ -207,10 +220,29 @@
                                                         <td valign="top" height="18" style="padding-top: 0px;" width="30%"> 
                                                             <table width="100%">
                                                                 <tr>
-                                                                    <td height="18" class="receipt_font" width="14%"><b>Paid by</b></td>
+                                                                    <td height="18" class="receipt_font" width="14%"><b>Mode of Payment</b></td>
                                                                     <td width="1%">:&nbsp;</td>
                                                                     <td class="receipt_font" width="74%">
-                                                                        <b><?= htmlspecialchars($receipt['transaction_type']) . ' -' . htmlspecialchars($receipt['transaction_ref_no'])  ?></b>
+                                                                        <b><?= htmlspecialchars($receipt['transaction_type']) . ' - ' . htmlspecialchars($receipt['transaction_ref_no'])  ?></b>
+                                                                    </td>
+                                                                    <td> 
+                                                                        <?php 
+                                                                            if ($cancelled === 1) {
+                                                                                echo '<span style="color: red; font-size: 20px;"><b>CANCELLED</b></span>';
+                                                                            } else {
+                                                                                echo '<span style="color: green; font-size: 20px;"><b>PAID</b></span>';
+                                                                            }
+                                                                        ?>
+                                                                    </td>
+                                                                </tr>
+                                                                <tr>
+                                                                    <td height="3"></td>
+                                                                </tr>
+                                                                <tr>
+                                                                    <td class="receipt_font" width="30%"><b>No. of Badges</b></td>
+                                                                    <td width="1%">:&nbsp;</td>
+                                                                    <td class="receipt_font" width="74%">
+                                                                        <b><?= htmlspecialchars($receipt['no_of_badges']) ?></b>
                                                                     </td>
                                                                 </tr>
                                                             </table>
@@ -220,7 +252,7 @@
                                             </td>
                                         </tr> 
                                         <tr>
-                                            <td height="50"></td>
+                                            <td height="12"></td>
                                         </tr>
                                     </table>
                                 </td>
@@ -243,7 +275,7 @@
                                             <td width="150" valign="top" align="right">
                                                 <table>
                                                     <tr>
-                                                        <td align="right" style="padding-right:20px;" class="receipt_font"><strong>For IMTMA</strong></td>
+                                                        <td align="right" style="padding-right: 105px;" class="receipt_font"><strong>For IMTMA</strong></td>
                                                     </tr>
                                                     <tr>
                                                         <td height="20"></td>

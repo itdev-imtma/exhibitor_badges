@@ -1,9 +1,7 @@
 <?php
     session_start();
 
-    // Check if the user is logged in
     if (!isset($_SESSION['user'])) {
-        // Redirect to the login page if not logged in
         header("Location: login.php");
         exit();
     }
@@ -13,7 +11,7 @@
     //Total No. of badges
     $query = "SELECT SUM(no_of_badges) as badge_count 
             FROM receipts 
-            WHERE cancelled = 0";
+            WHERE status = 'Issued' and cancelled = 0";
 
     $stmt = $conn->query($query);
     $no_of_badges = 0;
@@ -22,10 +20,14 @@
         $no_of_badges = $row['badge_count'];
     }
 
+    if ($no_of_badges === null) {
+        $no_of_badges = 0;
+    }
+
     //Total amount
     $total = "SELECT SUM(total_amount) as total_amount
             FROM receipts 
-            WHERE cancelled = 0";
+            WHERE status = 'Issued' and cancelled = 0";
 
     $total_stmt = $conn->query($total);
     $total_amount = 0;
@@ -34,10 +36,14 @@
         $total_amount = $row['total_amount'];
     }
 
+    if ($total_amount === null) {
+        $total_amount = 0;
+    }
+
     //Total Cancelled Badges
     $query1 = "SELECT SUM(no_of_badges) as cancelled_count 
             FROM receipts 
-            WHERE cancelled = 1";
+            WHERE status = 'Cancelled' and cancelled = 1";
 
     $stmt1 = $conn->query($query1);
     $cancelled_badges = 0;
@@ -46,10 +52,14 @@
         $cancelled_badges = $row['cancelled_count'];
     }
 
+    if ($cancelled_badges === null) {
+        $cancelled_badges = 0;
+    }
+
     //Total cancelled amount
     $total1 = "SELECT SUM(total_amount) as cancelled_amount
             FROM receipts 
-            WHERE cancelled = 1";
+            WHERE status = 'Cancelled' and cancelled = 1";
 
     $total_stmt1 = $conn->query($total1);
     $cancelled_amount = 0;
@@ -57,11 +67,15 @@
         $row = $total_stmt1->fetch_assoc();
         $cancelled_amount = $row['cancelled_amount'];
     }
+    
+    if ($cancelled_amount === null) {
+        $cancelled_amount = 0;
+    }
 
     //Total Issued Receipts
     $query2 = "SELECT COUNT(id) as issued_receipt
             FROM receipts 
-            WHERE cancelled = 0";
+            WHERE status = 'Issued' and cancelled = 0";
 
     $stmt2 = $conn->query($query2);
     $issued_receipts = 0;
@@ -73,7 +87,7 @@
     //Total Cancelled Receipts
     $query3 = "SELECT COUNT(id) as cancelled_receipt
             FROM receipts 
-            WHERE cancelled = 1";
+            WHERE status = 'Cancelled' and cancelled = 1";
 
     $stmt3 = $conn->query($query3);
     $cancelled_receipts = 0;
@@ -86,7 +100,7 @@
     $issued_data = "
         SELECT DATE(created_date) AS created_date, COUNT(*) AS total_value
         FROM receipts
-        WHERE cancelled = 0
+        WHERE status = 'Issued' and cancelled = 0
         GROUP BY DATE(created_date)
         ORDER BY created_date
     ";
@@ -108,7 +122,7 @@
     $cancelled_data = "
         SELECT DATE(created_date) AS created_date, COUNT(*) AS total_value
         FROM receipts
-        WHERE cancelled = 1
+        WHERE status = 'Cancelled' and cancelled = 1
         GROUP BY DATE(created_date)
         ORDER BY created_date
     ";
@@ -129,10 +143,10 @@
     //Issued, Amount, Cancelled, Amount
     $query4 = "SELECT 
         DATE(created_date) AS created_date, 
-        SUM(CASE WHEN cancelled = 0 THEN no_of_badges ELSE 0 END) AS issued_badges,
-        SUM(CASE WHEN cancelled = 0 THEN total_amount ELSE 0 END) AS issued_amount,
-        SUM(CASE WHEN cancelled = 1 THEN no_of_badges ELSE 0 END) AS cancelled_badges,
-        SUM(CASE WHEN cancelled = 1 THEN total_amount ELSE 0 END) AS cancelled_amount
+        SUM(CASE WHEN status = 'Issued' and cancelled = 0 THEN no_of_badges ELSE 0 END) AS issued_badges,
+        SUM(CASE WHEN status = 'Issued' and cancelled = 0 THEN total_amount ELSE 0 END) AS issued_amount,
+        SUM(CASE WHEN status = 'Cancelled' and cancelled = 1 THEN no_of_badges ELSE 0 END) AS cancelled_badges,
+        SUM(CASE WHEN status = 'Cancelled' and cancelled = 1 THEN total_amount ELSE 0 END) AS cancelled_amount
     FROM receipts
     GROUP BY DATE(created_date)
     ORDER BY DATE(created_date)";
@@ -203,6 +217,7 @@
                                 <li><a href="cancel-receipt.php">Issued Receipts</a></li>
                                 <li><a href="cancel.php">Cancelled Receipts</a></li>
                                 <li><a href="exhibitors-list.php">Exhibitors List</a></li>
+                                <li><a href="consolidated.php">Consolidated List</a></li>
                             </ul>
                         </div>
                         <a class="navbar-brand" href="index.php">
@@ -331,6 +346,12 @@
                                 <a href="exhibitors-list.php" aria-expanded="false">
                                     <i class="nav-icon ti ti-layout-column3-alt"></i>
                                     <span class="nav-title">Exhibitors List</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="consolidated.php" aria-expanded="false">
+                                    <i class="nav-icon ti ti-layout-column3-alt"></i>
+                                    <span class="nav-title">Consolidated List</span>
                                 </a>
                             </li>
                         </ul>
