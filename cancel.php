@@ -347,8 +347,8 @@
                 ]
             });
 
-            // Handle the cancel receipt action
-            $('.cancel-receipt').on('click', function() {
+            // Use event delegation to handle the cancel receipt action (this works across pages)
+            $('#combined-table').on('click', '.cancel-receipt', function() {
                 var receiptId = $(this).data('id');
                 $('.loader').show();
                 if (confirm("Are you sure you want to cancel this receipt?")) {

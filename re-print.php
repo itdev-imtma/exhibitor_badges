@@ -330,10 +330,12 @@
 
     <script>
         $(document).ready(function() {
+            // Toggle mobile menu on small screens
             $('.mobile-toggle').click(function() {
                 $('.mobile-menu').toggleClass('active');
             });
 
+            // Initialize DataTable
             var table = $('#combined-table').DataTable({
                 "bLengthChange": false,
                 "searching": true,
@@ -342,10 +344,17 @@
                 "order": [[0, 'desc']],
                 "columnDefs": [
                     {
-                        "targets": [8],  
+                        "targets": [8],  // Sort the created date column by date
                         "type": "date"
                     }
                 ]
+            });
+
+            // Use event delegation to handle clicks on reprint buttons, even on paginated pages
+            $(document).on('click', '.reprint-receipt', function() {
+                var receiptId = $(this).data('id');
+                var receiptUrl = 'http://www.imtex.in/exhibitor-badges/display_receipt.php?id=' + receiptId;
+                window.open(receiptUrl, '_blank');
             });
         });
     </script>

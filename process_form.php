@@ -13,10 +13,11 @@
         echo json_encode($response);
         exit();
     }
-
+    error_reporting(E_ALL);
+    ini_set('display_errors', 1);
     $response = [];
     
-    function generateReceiptNo($conn) {
+    /*function generateReceiptNo($conn) {
         $sql = "SELECT MAX(CAST(receipt_no AS UNSIGNED)) AS max_receipt_no FROM receipts";
         $result = $conn->query($sql);
 
@@ -25,6 +26,45 @@
             return $row['max_receipt_no'] + 1;
         } else {
             return 1; // Start from 1 if there are no records
+        }
+    }*/
+    
+    /*function generateReceiptNo() {
+        $receipt_no = uniqid('receipt-', true); 
+    
+        return $receipt_no;
+    }*/
+    
+    function generateReceiptNo($conn) {
+        // Start a transaction to ensure atomic operations
+        $conn->begin_transaction();
+    
+        try {
+            // Lock the rows by selecting the maximum receipt number
+            // 'FOR UPDATE' ensures that the row is locked for the duration of the transaction
+            $sql = "SELECT MAX(CAST(receipt_no AS UNSIGNED)) AS max_receipt_no FROM receipts FOR UPDATE";
+            $result = $conn->query($sql);
+    
+            if ($result === false) {
+                throw new Exception("Error fetching max receipt number");
+            }
+    
+            $newReceiptNo = 1; // Default in case there are no records
+            if ($result->num_rows > 0) {
+                $row = $result->fetch_assoc();
+                $newReceiptNo = $row['max_receipt_no'] + 1;
+            }
+    
+            // Commit the transaction: this will release the lock automatically
+            $conn->commit();
+    
+            // Return the new receipt number
+            return $newReceiptNo;
+        } catch (Exception $e) {
+            // If there's an error, rollback the transaction
+            $conn->rollback();
+            // Handle or log the error as needed
+            throw $e;  // Rethrow or log the error as appropriate
         }
     }
 
